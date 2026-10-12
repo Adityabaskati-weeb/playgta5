@@ -10,7 +10,15 @@ Run an archived PlayGTA5 browser client from your own computer. This project ser
 - A current Chrome, Brave, or Edge browser with WebGPU enabled and hardware acceleration on.
 - A complete client site mirror that you are authorized to use. The archived mirror was roughly **20 GB**; the exact size varies by copy.
 
-The game-data mirror is not included in Git. This repository does not link to a torrent or third-party game-data archive. Supply the files separately and do not commit them.
+The game-data mirror is a separate, large download and is not included in Git. Do not commit the mirror files to this repository.
+
+## Download the mirror with qBittorrent
+
+The user-provided mirror archive is approximately **19.7 GB**. To download it with qBittorrent, open the magnet link below. If your browser does not open qBittorrent automatically, copy the link, open qBittorrent, select **File → Add Torrent Link**, paste the full link, and start the download.
+
+[Download GTA5Webport.zip via magnet](magnet:?xt=urn:btih:57a4193cc3d3f069ce436fcda040ed4c705b76c7&dn=GTA5Webport.zip&tr=udp%3A%2F%2Ftracker.opentrackr.org%3A1337%2Fannounce&tr=udp%3A%2F%2Fopen.stealth.si%3A80%2Fannounce&tr=udp%3A%2F%2Ftracker.torrent.eu.org%3A451%2Fannounce&tr=udp%3A%2F%2Fopen.demonii.com%3A1337%2Fannounce&tr=udp%3A%2F%2Fexodus.desync.com%3A6969%2Fannounce&tr=http%3A%2F%2Ftracker2.dler.org%3A80%2Fannounce&tr=http%3A%2F%2Ftracker.dler.org%3A6969%2Fannounce)
+
+After the download finishes, extract the archive and use the folder containing `index.html`, `data\`, and `b\8b0b5899ed\` as the site root described below. Keep the mirror outside Git.
 
 ## Quick start on Windows
 
@@ -140,6 +148,6 @@ http://localhost:8000/?mode=sandbox&map=env_test
 
 ## Project provenance and license
 
-This repository preserves a public client snapshot that was previously served at `playgta5.com`; it is not the site's original development source. The upstream project does not provide a verified license for the client snapshot, so this repository does **not** claim that the snapshot is open-source or grant permission to reuse it. Public visibility on GitHub is not a substitute for a license. The large game-data mirror and any download/torrent link are intentionally excluded.
+This repository preserves a public client snapshot that was previously served at `playgta5.com`; it is not the site's original development source. The upstream project does not provide a verified license for the client snapshot, so this repository does **not** claim that the snapshot is open-source or grant permission to reuse it. Public visibility on GitHub is not a substitute for a license. The large game-data mirror is hosted separately and is not included in Git; the torrent link points to that separate archive and does not change the licensing of the client snapshot or game content.
 
 The upstream README credited Sebas Furbastian for collecting the snapshot. GTA V, its marks, and its game content belong to their respective rights holders.
