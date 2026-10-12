@@ -169,3 +169,5 @@ http://localhost:8000/?mode=sandbox&map=env_test
 This repository preserves a public client snapshot that was previously served at `playgta5.com`; it is not the site's original development source. The upstream project does not provide a verified license for the client snapshot, so this repository does **not** claim that the snapshot is open-source or grant permission to reuse it. Public visibility on GitHub is not a substitute for a license. The large game-data mirror is hosted separately and is not included in Git; the torrent link points to that separate archive and does not change the licensing of the client snapshot or game content.
 
 The upstream README credited Sebas Furbastian for collecting the snapshot. GTA V, its marks, and its game content belong to their respective rights holders.
+
+For takedown requests or concerns about material in this repository, email [animeweeb082004@gmail.com](mailto:animeweeb082004@gmail.com). Please include the repository URL and identify the material in question.
