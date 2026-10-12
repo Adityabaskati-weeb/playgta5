@@ -175,7 +175,7 @@ For takedown requests or concerns about material in this repository, email [anim
 ## Credits
 
 - Client snapshot source: [shadany7824](https://github.com/shadany7824).
-- Snapshot collection credit: Sebas Furbastian — Telegram [@SebasKitten](https://t.me/SebasKitten), X [@Sebas_Kitten](https://x.com/Sebas_Kitten).
+- Shoutout to Sebas Furbastian for scraping this code snapshot. I don't know his GitHub, but you can find him on Telegram [@SebasKitten](https://t.me/SebasKitten) and X [@Sebas_Kitten](https://x.com/Sebas_Kitten).
 
 ## Share this repository
 
