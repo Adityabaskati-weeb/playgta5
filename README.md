@@ -171,3 +171,12 @@ This repository preserves a public client snapshot that was previously served at
 The upstream README credited Sebas Furbastian for collecting the snapshot. GTA V, its marks, and its game content belong to their respective rights holders.
 
 For takedown requests or concerns about material in this repository, email [animeweeb082004@gmail.com](mailto:animeweeb082004@gmail.com). Please include the repository URL and identify the material in question.
+
+## Credits
+
+- Client snapshot source: [shadany7824](https://github.com/shadany7824).
+- Snapshot collection credit: Sebas Furbastian — Telegram [@SebasKitten](https://t.me/SebasKitten), X [@Sebas_Kitten](https://x.com/Sebas_Kitten).
+
+## Share this repository
+
+[https://github.com/Adityabaskati-weeb/playgta5](https://github.com/Adityabaskati-weeb/playgta5)
