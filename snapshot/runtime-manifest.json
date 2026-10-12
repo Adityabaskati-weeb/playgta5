@@ -1,6 +1,6 @@
 {
   "python_version": "3.12.14 (main, Aug 25 2026, 14:01:42) [MSC v.1944 64 bit (AMD64)]",
-  "source": "C:\\Users\\sebas\\.cache\\codex-runtimes\\codex-primary-runtime\\dependencies\\python",
+  "source": "local CPython installation (path omitted)",
   "scope": "Python executable, DLLs and standard library; third-party packages excluded",
   "files": [
     {

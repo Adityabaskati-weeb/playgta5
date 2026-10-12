@@ -20,9 +20,6 @@ completed = 0
 started = time.monotonic()
 records = {}
 failures = []
-STATE.mkdir(exist_ok=True)
-SITE.mkdir(parents=True, exist_ok=True)
-
 def emit(message):
     with lock:
         with (STATE / 'download.log').open('a', encoding='utf-8') as out:
@@ -53,6 +50,7 @@ def download(task):
             completed += 1
         return
     partial = target.with_name(target.name + '.part')
+    last_error = 'download failed without an exception'
     for attempt in range(4):
         try:
             offset = partial.stat().st_size if partial.exists() else 0
@@ -97,13 +95,14 @@ def download(task):
                     emit('SIZE DISCREPANCY ' + path + ': manifest=%d server=%d' % (expected, size))
                 return
         except Exception as exc:
+            last_error = str(exc)
             emit('RETRY %d %s: %s' % (attempt + 1, path, exc))
             if isinstance(exc, HTTPError) and exc.code == 416 and partial.exists():
                 partial.unlink()
             if attempt < 3:
                 time.sleep(2 ** (attempt + 1))
     with lock:
-        failures.append({'path': path, 'url': url, 'error': str(exc) if 'exc' in locals() else 'see log'})
+        failures.append({'path': path, 'url': url, 'error': last_error})
 
 def add_existing(path, source):
     target = SITE / path.lstrip('/')
@@ -114,6 +113,8 @@ def add_existing(path, source):
 
 def main():
     global records
+    STATE.mkdir(exist_ok=True)
+    SITE.mkdir(parents=True, exist_ok=True)
     if (STATE / 'files.jsonl').exists():
         for line in (STATE / 'files.jsonl').read_text(encoding='utf-8').splitlines():
             try:

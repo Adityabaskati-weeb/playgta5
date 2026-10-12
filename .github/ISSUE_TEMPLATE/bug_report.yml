@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible launcher, setup, or gameplay issue.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: Do not attach the mirror, game files, save data, or unredacted browser logs. The client snapshot's reuse rights are unverified.
+  - type: input
+    id: browser
+    attributes:
+      label: Browser and version
+      placeholder: Chrome 140, Brave 140, or Edge 140
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: Windows 11 24H2
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Include the mode and URL options used, but remove local usernames or file paths.
+      placeholder: 1. Start the local server…
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: checkboxes
+    id: safe-content
+    attributes:
+      label: Content check
+      options:
+        - label: I did not attach game/mirror files, save data, or private logs.
+          required: true

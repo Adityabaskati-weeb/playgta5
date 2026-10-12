@@ -7,7 +7,6 @@ import concurrent.futures as futures
 import hashlib
 import html.parser
 import json
-import os
 import re
 import threading
 import time
@@ -22,29 +21,35 @@ SNAPSHOT = ROOT / "snapshot"
 BASE = "https://playgta5.com"
 UA = "curl/8.0 public-mirror-discovery"
 TIMEOUT = 25
-MAX_WORKERS = 16
+MAX_WORKERS = 8
+MAX_RESPONSE_BYTES = 8 * 1024 * 1024
 
-known = json.loads((SNAPSHOT / "manifest-sha256.json").read_text(encoding="utf-8"))
-known_paths = {x["path"] for x in known}
-homepage = (ROOT / "homepage.html").read_bytes()
-homepage_hash = hashlib.sha256(homepage).hexdigest()
+known_paths = set()
+homepage_hash = ""
 lock = threading.Lock()
 attempts = []
 added = []
 
 def norm_path(path):
     path = urllib.parse.unquote(urllib.parse.urlsplit(path).path)
+    if "\\" in path or "\x00" in path or any(part in {".", ".."} for part in path.split("/")):
+        return ""
     if not path.startswith("/"):
         path = "/" + path
     return path
 
 def request(path):
-    url = BASE + path
+    url = BASE + urllib.parse.quote(path, safe="/-._~")
     started = time.monotonic()
     req = urllib.request.Request(url, headers={"User-Agent": UA, "Accept": "*/*"})
     try:
         with urllib.request.urlopen(req, timeout=TIMEOUT) as res:
-            body = res.read()
+            content_length = res.headers.get("Content-Length")
+            if content_length is not None and int(content_length) > MAX_RESPONSE_BYTES:
+                raise ValueError("response exceeds the 8 MiB discovery limit")
+            body = res.read(MAX_RESPONSE_BYTES + 1)
+            if len(body) > MAX_RESPONSE_BYTES:
+                raise ValueError("response exceeds the 8 MiB discovery limit")
             out = {"url": url, "path": path, "status": res.status,
                    "content_type": res.headers.get("Content-Type", ""),
                    "bytes": len(body), "body": body,
@@ -99,7 +104,10 @@ def same_origin_refs(path, body, content_type):
 def save_addition(result, provenance):
     path, body = result["path"], result["body"]
     if path in known_paths or fallback(result): return False
-    target = MIRROR.joinpath(*path.lstrip("/").split("/"))
+    mirror_root = MIRROR.resolve()
+    target = (mirror_root / path.lstrip("/")).resolve()
+    if not target.is_relative_to(mirror_root):
+        return False
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists(): return False
     target.write_bytes(body)
@@ -120,53 +128,63 @@ def run_batch(paths, provenance):
                 refs.update(same_origin_refs(result["path"], result["body"], result["content_type"]))
     return refs
 
-# Conventional public discovery endpoints and build references visible in root assets.
-standard = [
-    "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml",
-    "/favicon.ico", "/favicon.png", "/apple-touch-icon.png", "/site.webmanifest",
-    "/manifest.webmanifest", "/manifest.json", "/browserconfig.xml", "/humans.txt",
-    "/security.txt", "/.well-known/security.txt",
-]
-builds = sorted({p.split("/")[2] for p in known_paths if p.startswith("/b/") and p.count("/") >= 2})
-scripts = [p for p in known_paths if p.endswith((".js", ".css", ".html"))]
-maps = [p + ".map" for p in scripts]
-for b in builds:
-    standard += [f"/b/{b}/manifest.json", f"/b/{b}/manifest.webmanifest", f"/b/{b}/sw.js", f"/b/{b}/service-worker.js"]
+def main():
+    global known_paths, homepage_hash, attempts, added
+    known = json.loads((SNAPSHOT / "manifest-sha256.json").read_text(encoding="utf-8"))
+    known_paths = {item["path"] for item in known}
+    homepage_hash = hashlib.sha256((ROOT / "homepage.html").read_bytes()).hexdigest()
+    attempts = []
+    added = []
+    standard = [
+        "/robots.txt", "/sitemap.xml", "/sitemap_index.xml", "/sitemap-index.xml",
+        "/favicon.ico", "/favicon.png", "/apple-touch-icon.png", "/site.webmanifest",
+        "/manifest.webmanifest", "/manifest.json", "/browserconfig.xml", "/humans.txt",
+        "/security.txt", "/.well-known/security.txt",
+    ]
+    builds = sorted({p.split("/")[2] for p in known_paths if p.startswith("/b/") and p.count("/") >= 2})
+    scripts = [p for p in known_paths if p.endswith((".js", ".css", ".html"))]
+    maps = [p + ".map" for p in scripts]
+    for b in builds:
+        standard += [f"/b/{b}/manifest.json", f"/b/{b}/manifest.webmanifest", f"/b/{b}/sw.js", f"/b/{b}/service-worker.js"]
 
-# Every existing path's directory gets exactly one GET. This detects enabled listing/index pages.
-dirs = sorted({p.rsplit("/", 1)[0] + "/" for p in known_paths if p.count("/") >= 2})
-new_refs = run_batch(standard + maps, "conventional-or-runtime-derived")
-new_refs.update(run_batch(dirs, "known-directory-listing-check"))
+    # Every existing path's directory gets exactly one GET. This detects enabled listing/index pages.
+    dirs = sorted({p.rsplit("/", 1)[0] + "/" for p in known_paths if p.count("/") >= 2})
+    new_refs = run_batch(standard + maps, "conventional-or-runtime-derived")
+    new_refs.update(run_batch(dirs, "known-directory-listing-check"))
 
-# Follow only newly surfaced same-origin references to a fixed point.
-rounds = 0
-while new_refs and rounds < 4:
-    todo = {p for p in new_refs if p not in known_paths}
-    new_refs = run_batch(todo, "reachable-same-origin-reference") if todo else set()
-    rounds += 1
+    # Follow only newly surfaced same-origin references to a fixed point.
+    rounds = 0
+    while new_refs and rounds < 4:
+        todo = {p for p in new_refs if p not in known_paths}
+        new_refs = run_batch(todo, "reachable-same-origin-reference") if todo else set()
+        rounds += 1
 
-attempts.sort(key=lambda x: x["path"])
-added.sort(key=lambda x: x["path"])
-status_counts = {}
-for x in attempts: status_counts[str(x.get("status"))] = status_counts.get(str(x.get("status")), 0) + 1
-report = {
-    "base": BASE, "run_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
-    "user_agent": UA, "network_concurrency": MAX_WORKERS,
-    "known_input_paths": len(known), "known_derived_directories": len(dirs),
-    "build_ids": builds, "attempt_count": len(attempts), "status_counts": status_counts,
-    "added_count": len(added), "added_bytes": sum(x["bytes"] for x in added),
-    "attempts": attempts,
-    "coverage": ["robots/sitemaps/icons/web manifests/.well-known security", "runtime source-map candidates", "build-local manifest/service-worker candidates", "one trailing-slash request for every directory derived from the 12,480-path inventory", "same-origin references extracted from successful textual responses"],
-    "limits": ["No authentication, credentials, bypasses, parameter fuzzing, or blind filename dictionaries.", "A non-listing directory response cannot prove undisclosed children absent.", "References embedded only in binary assets or constructed dynamically beyond inspected textual responses are outside this crawl.", "HTTP success is retained only when it is not the known generic homepage fallback; non-200 results are logged but not downloaded."],
-}
-(SNAPSHOT / "discovery-added.json").write_text(json.dumps(added, indent=2) + "\n", encoding="utf-8")
-(SNAPSHOT / "discovery-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
-(SNAPSHOT / "DISCOVERY_REPORT.md").write_text(
-    "# Public discovery report\n\n"
-    f"- Input inventory: {len(known)} paths; derived directories: {len(dirs)}.\n"
-    f"- Requests: {len(attempts)}; status counts: {status_counts}.\n"
-    f"- Additions: {len(added)} files / {sum(x['bytes'] for x in added)} bytes.\n"
-    "- Scope: standard discovery files, source-map/build candidates, every known directory, then reachable same-origin textual references.\n"
-    "- Limits: no authenticated/private probing or blind dictionary enumeration; directory non-listing does not establish that no unlinked children exist.\n",
-    encoding="utf-8")
-print(json.dumps({"attempts": len(attempts), "status_counts": status_counts, "added": added}, indent=2))
+    attempts.sort(key=lambda x: x["path"])
+    added.sort(key=lambda x: x["path"])
+    status_counts = {}
+    for x in attempts: status_counts[str(x.get("status"))] = status_counts.get(str(x.get("status")), 0) + 1
+    report = {
+        "base": BASE, "run_utc": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+        "user_agent": UA, "network_concurrency": MAX_WORKERS,
+        "known_input_paths": len(known), "known_derived_directories": len(dirs),
+        "build_ids": builds, "attempt_count": len(attempts), "status_counts": status_counts,
+        "added_count": len(added), "added_bytes": sum(x["bytes"] for x in added),
+        "attempts": attempts,
+        "coverage": ["robots/sitemaps/icons/web manifests/.well-known security", "runtime source-map candidates", "build-local manifest/service-worker candidates", "one trailing-slash request for every directory derived from the 12,480-path inventory", "same-origin references extracted from successful textual responses"],
+        "limits": ["No authentication, credentials, bypasses, parameter fuzzing, or blind filename dictionaries.", "A non-listing directory response cannot prove undisclosed children absent.", "References embedded only in binary assets or constructed dynamically beyond inspected textual responses are outside this crawl.", "HTTP success is retained only when it is not the known generic homepage fallback; non-200 results are logged but not downloaded."],
+    }
+    (SNAPSHOT / "discovery-added.json").write_text(json.dumps(added, indent=2) + "\n", encoding="utf-8")
+    (SNAPSHOT / "discovery-report.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    (SNAPSHOT / "DISCOVERY_REPORT.md").write_text(
+        "# Public discovery report\n\n"
+        f"- Input inventory: {len(known)} paths; derived directories: {len(dirs)}.\n"
+        f"- Requests: {len(attempts)}; status counts: {status_counts}.\n"
+        f"- Additions: {len(added)} files / {sum(x['bytes'] for x in added)} bytes.\n"
+        "- Scope: standard discovery files, source-map/build candidates, every known directory, then reachable same-origin textual references.\n"
+        "- Limits: no authenticated/private probing or blind dictionary enumeration; directory non-listing does not establish that no unlinked children exist.\n",
+        encoding="utf-8")
+    print(json.dumps({"attempts": len(attempts), "status_counts": status_counts, "added": added}, indent=2))
+
+
+if __name__ == "__main__":
+    main()

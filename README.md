@@ -4,9 +4,11 @@ Run an archived PlayGTA5 browser client from your own computer. This project ser
 
 > **Unofficial project.** This is a community client snapshot, not the original website's development repository, and is not affiliated with or endorsed by Rockstar Games.
 
+> **License status.** The client's reuse rights have not been verified. The repository is public, but it does not currently grant an open-source license; do not assume permission to reuse or redistribute its contents.
+
 ## What you need
 
-- Windows 10/11 x64, or another OS with Python 3.11 or newer.
+- Windows 10/11 x64 for the included launcher and bundled runtime. Other platforms can run the server with an installed Python 3.11 or newer.
 - A current Chrome, Brave, or Edge browser with WebGPU enabled and hardware acceleration on.
 - A complete client site mirror that you are authorized to use. The archived mirror was roughly **20 GB**; the exact size varies by copy.
 
@@ -102,6 +104,12 @@ Or, with an installed Python 3.11+:
 python .\serve_local.py --root "D:\GameData\playgta5.com" --port 8000 --open
 ```
 
+On macOS or Linux, run the same server with your installed Python and the site's mirror root:
+
+```sh
+python3 ./serve_local.py --root "/path/to/playgta5.com" --port 8000 --open
+```
+
 ## Browser and graphics setup
 
 The server supplies the cross-origin isolation headers the WebAssembly engine needs. `localhost` is treated as a secure browser context, so no insecure-origin flag is needed.
@@ -147,6 +155,14 @@ http://localhost:8000/?mode=sandbox&map=env_test
 - **Blank page or WebGPU error** — Update the browser, enable hardware acceleration, and check its GPU status page.
 - **Memory error or browser tab crash** — Keep the reduced profile enabled, close other tabs and restart the game. Browser memory use cannot be hard-capped by this launcher.
 - **Port is busy** — Stop the other process using port 8000 before launching this server.
+
+## Repository map
+
+- `serve_local.py` and the launchers start the isolated local HTTP server.
+- `mirror_site.py` downloads the configured public client assets into the ignored `mirror/` directory.
+- `homepage.html`, `loader.js`, `game.js`, `io_worker.js`, and `wgpu_worker.js` make up the captured browser client and local changes.
+- `snapshot/` contains asset inventories, provenance notes, and generated verification/package records.
+- `runtime/` contains the portable Windows Python runtime; `bundle_runtime.py` rebuilds it from a compatible local Windows Python installation.
 
 ## Project provenance and license
 

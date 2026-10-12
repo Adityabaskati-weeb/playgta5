@@ -4,7 +4,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
 PREFIX = 'playgta5-offline'
-OUTPUT = ROOT / 'playgta5-offline-2026-10-06.zip'
+OUTPUT = ROOT / 'playgta5-offline.zip'
 
 class HashWriter:
     """Non-seekable ZIP output: the hash covers every byte exactly once."""
@@ -23,10 +23,16 @@ class HashWriter:
         self.raw.flush()
 
 def main():
-    expected = {'mirror/playgta5.com/' + r['path'].lstrip('/'): r['sha256']
-                for r in json.loads((ROOT / 'snapshot/manifest-sha256.json').read_text())}
-    expected.update({r['path']: r['sha256'] for r in
-        json.loads((ROOT / 'snapshot/runtime-manifest.json').read_text())['files']})
+    inventory = json.loads((ROOT / 'snapshot/manifest-sha256.json').read_text(encoding='utf-8'))
+    runtime_manifest = json.loads((ROOT / 'snapshot/runtime-manifest.json').read_text(encoding='utf-8'))
+    expected = {}
+    for relative, digest in [
+        ('mirror/playgta5.com/' + r['path'].lstrip('/'), r['sha256']) for r in inventory
+    ] + [(r['path'], r['sha256']) for r in runtime_manifest['files']]:
+        if relative in expected and expected[relative] != digest:
+            raise ValueError('Conflicting inventory hashes for ' + relative)
+        expected[relative] = digest
+
     files = []
     for name in ['mirror', 'runtime', 'snapshot']:
         for path in (ROOT / name).rglob('*'):
@@ -36,8 +42,23 @@ def main():
                  'mirror_site.py', 'bundle_runtime.py', 'build_portable_zip.py', 'homepage.html',
                  'loader.js', 'game.js', 'io_worker.js', 'wgpu_worker.js', 'headers.txt',
                  'data-manifest.json', 'shader-index.json', 'public_discovery.py']:
-        files.append(ROOT / name)
+        path = ROOT / name
+        if not path.is_file():
+            raise FileNotFoundError('Required project file is missing: ' + name)
+        files.append(path)
     files.sort(key=lambda p: str(p.relative_to(ROOT)))
+    packaged = {str(path.relative_to(ROOT)).replace('\\', '/') for path in files}
+    missing = sorted(set(expected) - packaged)
+    if missing:
+        preview = ', '.join(missing[:8])
+        suffix = ' ...' if len(missing) > 8 else ''
+        raise ValueError('Cannot build a complete portable package: %d inventory files are missing (%s%s)' %
+                         (len(missing), preview, suffix))
+
+    pth_files = [r['path'] for r in runtime_manifest['files'] if r['path'].endswith('._pth')]
+    if len(pth_files) != 1 or pth_files[0] not in packaged:
+        raise ValueError('Runtime manifest must identify exactly one packaged ._pth configuration file')
+    runtime_path_config = pth_files[0]
     total = sum(p.stat().st_size for p in files)
     processed = 0
     records = []
@@ -80,7 +101,7 @@ def main():
         assert len(archive.infolist()) == len(records) + 1
         assert archive.read(PREFIX + '/snapshot/package-manifest.json') == manifest_bytes
         assert archive.read(PREFIX + '/Launch-Local.cmd') == (ROOT / 'Launch-Local.cmd').read_bytes()
-        assert archive.read(PREFIX + '/runtime/python312._pth') == (ROOT / 'runtime/python312._pth').read_bytes()
+        assert archive.read(PREFIX + '/' + runtime_path_config) == (ROOT / runtime_path_config).read_bytes()
         for rec, info in zip(records, archive.infolist()):
             assert info.filename == PREFIX + '/' + rec['path'] and info.file_size == rec['bytes']
     report = {'archive': OUTPUT.name, 'bytes': OUTPUT.stat().st_size, 'sha256': archive_hash,

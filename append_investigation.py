@@ -3,7 +3,7 @@ import hashlib, json, time, zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-ARCHIVE = ROOT / 'playgta5-offline-2026-10-06.zip'
+ARCHIVE = ROOT / 'playgta5-offline.zip'
 PREFIX = 'playgta5-offline/'
 NAMES = ['INVESTIGATION.md', 'ENGINE_INVESTIGATION.md', 'inspect_assets.py',
          'engine_static_evidence.py', 'append_investigation.py', 'snapshot/asset-evidence.json',

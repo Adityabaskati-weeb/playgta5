@@ -1,8 +1,8 @@
 """Local mirror server: isolation headers, byte ranges, and engine batch I/O."""
-import argparse, gzip, io, json, mimetypes, re, shutil, webbrowser
+import argparse, gzip, io, json, mimetypes, re, webbrowser
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit, unquote, parse_qs
+from urllib.parse import urlsplit, parse_qs
 
 ROOT = Path(__file__).resolve().parent / 'mirror' / 'playgta5.com'
 mimetypes.add_type('application/wasm', '.wasm')
@@ -13,6 +13,15 @@ class Handler(SimpleHTTPRequestHandler):
         self.byte_range = None
         super().__init__(*args, directory=str(ROOT), **kwargs)
 
+    def parse_request(self):
+        if not super().parse_request():
+            return False
+        host = self.headers.get('Host', '')
+        if urlsplit('//' + host).hostname not in {'localhost', '127.0.0.1', '::1'}:
+            self.send_error(421, 'This server accepts local Host names only')
+            return False
+        return True
+
     def end_headers(self):
         self.send_header('Cross-Origin-Opener-Policy', 'same-origin')
         self.send_header('Cross-Origin-Embedder-Policy', 'require-corp')
@@ -21,9 +30,17 @@ class Handler(SimpleHTTPRequestHandler):
         super().end_headers()
 
     def send_head(self):
+        try:
+            path = Path(self.translate_path(self.path)).resolve()
+            root = Path(self.directory).resolve()
+        except (OSError, RuntimeError):
+            self.send_error(404)
+            return None
+        if not path.is_relative_to(root):
+            self.send_error(404)
+            return None
         if not self.headers.get('Range'):
             return super().send_head()
-        path = Path(self.translate_path(self.path))
         if not path.is_file():
             self.send_error(404)
             return None
@@ -66,9 +83,19 @@ class Handler(SimpleHTTPRequestHandler):
         if url.path != '/data/batch':
             self.send_error(404)
             return
-        length = int(self.headers.get('Content-Length', '0'))
+        try:
+            length = int(self.headers.get('Content-Length', '0'))
+        except ValueError:
+            self.send_error(400, 'invalid Content-Length')
+            return
+        if length < 0:
+            self.send_error(400, 'invalid Content-Length')
+            return
         if length > 1024 * 1024:
             self.send_error(413)
+            return
+        if length == 0:
+            self.send_error(400, 'empty batch')
             return
         try:
             runs = json.loads(self.rfile.read(length))

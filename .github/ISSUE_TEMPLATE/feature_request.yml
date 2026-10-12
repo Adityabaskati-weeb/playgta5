@@ -1,0 +1,19 @@
+name: Feature request
+description: Suggest an improvement to setup, documentation, or the local runner.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: Do not propose redistributing mirror or game data through this repository.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like to happen?
+    validations:
+      required: true
