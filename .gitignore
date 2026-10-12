@@ -1,2 +1,10 @@
 mirror/
+.mirror/
 media/
+work/
+*.part
+*.zip
+__pycache__/
+*.py[cod]
+/dist/
+/build/

@@ -1,6 +1,16 @@
+param(
+    [string]$Root,
+    [int]$Port = 8000
+)
+
 $ErrorActionPreference = 'Stop'
-$pythonExe = 'C:\Users\sebas\.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+$pythonExe = Join-Path $PSScriptRoot 'runtime\python.exe'
 if (-not (Test-Path -LiteralPath $pythonExe)) {
     $pythonExe = (Get-Command python -ErrorAction Stop).Source
 }
-& $pythonExe (Join-Path $PSScriptRoot 'serve_local.py')
+$arguments = @((Join-Path $PSScriptRoot 'serve_local.py'), '--open', '--port', "$Port")
+if ($Root) {
+    $arguments += @('--root', $Root)
+}
+& $pythonExe @arguments
+exit $LASTEXITCODE

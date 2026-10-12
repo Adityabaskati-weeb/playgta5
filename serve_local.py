@@ -107,8 +107,26 @@ class Handler(SimpleHTTPRequestHandler):
 if __name__ == '__main__':
     args = argparse.ArgumentParser()
     args.add_argument('--port', type=int, default=8000)
+    args.add_argument('--root', type=Path, default=ROOT,
+                      help='site mirror directory containing index.html and data/ (default: %(default)s)')
     args.add_argument('--open', action='store_true', help='open the default browser after binding')
     options = args.parse_args()
+
+    ROOT = options.root.expanduser().resolve()
+    required = [
+        Path('index.html'),
+        Path('data/manifest.json'),
+        Path('b/8b0b5899ed/loader.js'),
+        Path('b/8b0b5899ed/game.wasm'),
+    ]
+    missing = [str(path) for path in required if not (ROOT / path).is_file()]
+    if missing:
+        print('The local mirror is missing or incomplete: %s' % ROOT, flush=True)
+        print('Expected a site root containing index.html, data/, and b/8b0b5899ed/.', flush=True)
+        print('Place the mirror at %s or pass --root "<site-root>".' % (Path(__file__).resolve().parent / 'mirror' / 'playgta5.com'), flush=True)
+        print('Missing required files: ' + ', '.join(missing), flush=True)
+        raise SystemExit(2)
+
     server = ThreadingHTTPServer(('127.0.0.1', options.port), Handler)
     address = 'http://localhost:%d/' % server.server_port
     print('Local mirror: %s (Ctrl+C to stop)' % address, flush=True)
